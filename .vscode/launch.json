@@ -1,0 +1,54 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Tests",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "test:debug"],
+            "skipFiles": ["<node_internals>/**"],
+            "console": "integratedTerminal"
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Development",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "dev"],
+            "skipFiles": ["<node_internals>/**"],
+            "console": "integratedTerminal",
+            "env": {
+                "NODE_ENV": "development"
+            }
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Launch Production",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "prod"],
+            "skipFiles": ["<node_internals>/**"],
+            "console": "integratedTerminal",
+            "env": {
+                "NODE_ENV": "production"
+            }
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug Server",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "debug"],
+            "skipFiles": ["<node_internals>/**"],
+            "console": "integratedTerminal",
+            "restart": true
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Full Debug",
+            "configurations": ["Debug Server"]
+        }
+    ]
+}
