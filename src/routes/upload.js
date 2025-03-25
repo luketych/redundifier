@@ -1,11 +1,25 @@
 const express = require('express');
 const { sendDuplicateRequests } = require('../services/request');
 const { formatJsonResponses, setResponseHeaders } = require('../services/response');
+const healthService = require('../services/health');
 
 const router = express.Router();
 
+// Health check middleware
+const healthCheckMiddleware = (req, res, next) => {
+    const status = healthService.getStatus();
+    if (!status.isUp) {
+        return res.status(503).json({
+            error: 'Service Unavailable',
+            message: 'Target server is currently unreachable',
+            lastCheck: status.lastCheck
+        });
+    }
+    next();
+};
+
 // Handle POST requests to /upload/*
-router.post('/*', express.raw({ type: '*/*' }), async (req, res) => {
+router.post('/*', express.raw({ type: '*/*' }), healthCheckMiddleware, async (req, res) => {
     const fullPath = req.originalUrl;
     console.log('Intercepted upload request to:', fullPath);
     
@@ -25,8 +39,10 @@ router.post('/*', express.raw({ type: '*/*' }), async (req, res) => {
         }
     } catch (error) {
         console.error('Error forwarding upload request:', error);
-        res.status(500).json({
-            error: 'Failed to process upload request',
+        healthService.checkHealth(); // Trigger immediate health check on error
+        res.status(503).json({
+            error: 'Service Unavailable',
+            message: 'Failed to process upload request',
             details: error.message
         });
     }
