@@ -1,4 +1,4 @@
-const { TARGET } = require('../config/server');
+const { TARGET, IS_DOCKER_INTERNAL } = require('../config/server');
 
 /**
  * Sends a request to the target server and processes the response
@@ -48,7 +48,13 @@ async function sendRequest(targetUrl, headers, body) {
  * @returns {Promise<Array>} The processed responses
  */
 async function sendDuplicateRequests(path, headers, body) {
-    const targetUrl = `${TARGET}${path}`;
+    let targetUrl;
+    if (IS_DOCKER_INTERNAL) {
+        // Use host.docker.internal when running in Docker
+        targetUrl = `http://host.docker.internal:1337${path}`;
+    } else {
+        targetUrl = `${TARGET}${path}`;
+    }
     return Promise.all([
         sendRequest(targetUrl, headers, body),
         sendRequest(targetUrl, headers, body)

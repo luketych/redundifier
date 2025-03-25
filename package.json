@@ -18,6 +18,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "abort-controller": "^3.0.0",
     "express": "^4.21.2",
     "http-proxy-middleware": "^3.0.3",
     "raw-body": "^3.0.0"

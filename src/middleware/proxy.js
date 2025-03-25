@@ -5,12 +5,12 @@ const healthService = require('../services/health');
 // Health check middleware
 const healthCheckMiddleware = (req, res, next) => {
     healthService.checkHealth();
-    const status = healthService.getStatus();
-    if (!status.isUp) {
+    const isServerUp = healthService.isServerUp
+    if (!isServerUp) {
         return res.status(503).json({
             error: 'Service Unavailable',
             message: `Target server ${TARGET} is currently unreachable`,
-            lastCheck: status.lastCheck
+            lastCheck: healthService.lastCheck.toISOString()
         });
     }
     next();
