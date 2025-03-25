@@ -9,7 +9,7 @@ const app = express();
 app.use('/api/upload', uploadRoutes);
 
 // Use proxy for all other requests
-app.use('/', proxyMiddleware);
+app.use('/', ...proxyMiddleware);
 
 // Only start the server if this file is run directly (not required as a module)
 if (require.main === module) {
