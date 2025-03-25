@@ -2,16 +2,26 @@ const express = require('express');
 const { sendDuplicateRequests } = require('../services/request');
 const { formatJsonResponses, setResponseHeaders } = require('../services/response');
 const healthService = require('../services/health');
+const { TARGET } = require('../config/server');
 
 const router = express.Router();
 
 // Health check middleware
-const moddleware = (req, res, next) => {
+const healthCheckMiddleware = (req, res, next) => {
+    healthService.checkHealth();
+    const isServerUp = healthService.isServerUp;
+    if (!isServerUp) {
+        return res.status(503).json({
+            error: 'Service Unavailable',
+            message: `Target server ${TARGET} is currently unreachable`,
+            lastCheck: healthService.lastCheck.toISOString()
+        });
+    }
     next();
 };
 
 // Handle POST requests to /upload/*
-router.post('/*', express.raw({ type: '*/*' }), moddleware, async (req, res) => {
+router.post('/*', express.raw({ type: '*/*' }), healthCheckMiddleware, async (req, res) => {
     const fullPath = req.originalUrl;
     console.log('Intercepted upload request to:', fullPath);
     
