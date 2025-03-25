@@ -5,17 +5,6 @@ class HealthService {
     constructor() {
         this.isServerUp = true;
         this.lastCheck = null;
-        this.checkInterval = 60000; // 1 minute
-        this.startPeriodicCheck();
-    }
-
-    startPeriodicCheck() {
-        setInterval(() => {
-            this.checkHealth();
-        }, this.checkInterval);
-        
-        // Initial check
-        this.checkHealth();
     }
 
     checkHealth() {
@@ -25,6 +14,8 @@ class HealthService {
             port: url.port,
             path: '/',
             timeout: 2000, // 2 second timeout
+            maxRedirects: 5, // Allow up to 5 redirects
+            followRedirects: true
         };
 
         const req = http.request(options, (res) => {

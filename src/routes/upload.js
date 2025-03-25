@@ -6,20 +6,12 @@ const healthService = require('../services/health');
 const router = express.Router();
 
 // Health check middleware
-const healthCheckMiddleware = (req, res, next) => {
-    const status = healthService.getStatus();
-    if (!status.isUp) {
-        return res.status(503).json({
-            error: 'Service Unavailable',
-            message: 'Target server is currently unreachable',
-            lastCheck: status.lastCheck
-        });
-    }
+const moddleware = (req, res, next) => {
     next();
 };
 
 // Handle POST requests to /upload/*
-router.post('/*', express.raw({ type: '*/*' }), healthCheckMiddleware, async (req, res) => {
+router.post('/*', express.raw({ type: '*/*' }), moddleware, async (req, res) => {
     const fullPath = req.originalUrl;
     console.log('Intercepted upload request to:', fullPath);
     

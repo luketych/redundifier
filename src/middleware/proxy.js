@@ -4,6 +4,7 @@ const healthService = require('../services/health');
 
 // Health check middleware
 const healthCheckMiddleware = (req, res, next) => {
+    healthService.checkHealth();
     const status = healthService.getStatus();
     if (!status.isUp) {
         return res.status(503).json({
