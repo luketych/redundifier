@@ -1,0 +1,19 @@
+services:
+  app:
+    container_name: redundafier
+    build: .
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - type: bind
+        source: .
+        target: /app
+      - type: volume
+        target: /app/node_modules
+
+volumes:
+  node_modules:

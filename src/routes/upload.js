@@ -6,11 +6,12 @@ const router = express.Router();
 
 // Handle POST requests to /upload/*
 router.post('/*', express.raw({ type: '*/*' }), async (req, res) => {
-    console.log('Intercepted upload request to:', req.path);
+    const fullPath = req.originalUrl;
+    console.log('Intercepted upload request to:', fullPath);
     
     try {
         // Send the same request twice
-        const [response1, response2] = await sendDuplicateRequests(req.path, req.headers, req.body);
+        const [response1, response2] = await sendDuplicateRequests(fullPath, req.headers, req.body);
 
         if (response1.type === 'json' && response2.type === 'json') {
             // For JSON responses, combine them into an array with metadata
