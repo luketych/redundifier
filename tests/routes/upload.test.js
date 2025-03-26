@@ -2,11 +2,11 @@ const express = require('express');
 const request = require('supertest');
 const multer = require('multer');
 const FormData = require('form-data');
-const { sendRequest } = require('../../services/request');
-const { TARGET } = require('../../config/server');
+const { sendRequest } = require('../../src/services/request');
+const { TARGET } = require('../../src/config/server');
 
 // Mock dependencies
-jest.mock('../../services/request');
+jest.mock('../../src/services/request');
 jest.mock('multer', () => {
     const multerMock = () => ({
         array: (fieldName) => (req, res, next) => {
@@ -44,7 +44,7 @@ describe('Upload Router', () => {
         };
         global.console = mockConsole;
 
-        const uploadRouter = require('../upload');
+        const uploadRouter = require('../../src/routes/upload');
         app = express();
         app.use(express.json());
         app.use('/api/upload', uploadRouter);
@@ -252,7 +252,7 @@ describe('Upload Router', () => {
             };
             
             // Import handleMulterError directly
-            const uploadRouter = require('../upload');
+            const uploadRouter = require('../../src/routes/upload');
             const handleMulterError = uploadRouter.handleMulterError;
             
             // Call the middleware directly
@@ -268,9 +268,8 @@ describe('Upload Router', () => {
 
         it('should validate multiple files properly', async () => {
             // Test middleware functions directly
-            const uploadRouter = require('../upload');
+            const uploadRouter = require('../../src/routes/upload');
             const validateUpload = uploadRouter.validateUpload;
-            const handleMulterError = uploadRouter.handleMulterError;
             
             // Mock request with invalid file
             const req = {
@@ -305,8 +304,6 @@ describe('Upload Router', () => {
                 message: 'Invalid file buffer'
             });
             expect(mockNext).not.toHaveBeenCalled();
-
         });
-
     });
 });

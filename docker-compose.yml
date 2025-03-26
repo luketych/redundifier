@@ -1,3 +1,5 @@
+name: redundafier
+
 services:
   redundafier:
     container_name: redundafier
