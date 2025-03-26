@@ -8,6 +8,7 @@ const { TARGET, IS_DOCKER_INTERNAL } = require('../config/server');
  * @returns {Promise<object>} The processed response
  */
 async function sendRequest(targetUrl, headers, body) {
+    console.log("sendRequest")
     const response = await fetch(targetUrl, {
         method: 'POST',
         headers: {
@@ -48,6 +49,8 @@ async function sendRequest(targetUrl, headers, body) {
  * @returns {Promise<Array>} The processed responses
  */
 async function sendDuplicateRequests(path, headers, body) {
+    console.log("sendDuplicateRequests")
+
     let targetUrl;
     if (IS_DOCKER_INTERNAL) {
         // Use host.docker.internal when running in Docker

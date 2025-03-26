@@ -1,12 +1,15 @@
 services:
-  app:
+  redundafier:
     container_name: redundafier
     build: .
+    platform: linux/amd64
     environment:
       NODE_ENV: development
       HOST: 0.0.0.0
       PORT: 1336
       IS_FORWARDED_SERVER_ON_SAME_DOCKER: 1
+    networks:
+      - cards_net
     ports:
       - "1336:1336"
     volumes:
@@ -23,3 +26,8 @@ services:
 
 volumes:
   node_modules:
+
+networks:
+  cards_net:
+    name: cards_network
+    external: true

@@ -26,7 +26,7 @@ class HealthService {
                 throw new Error(`Redirect response without a Location header from ${url}`);
             }
 
-            console.log(`Redirecting to: ${location}`);
+            console.log(`Redirecting to ${url}: ${location}`);
 
             const newUrl = new URL(location, url).toString();
             const resp = this.fetchWithRedirects(newUrl, options, maxRedirects - 1);
@@ -37,7 +37,8 @@ class HealthService {
     }
 
     async checkHealth() {
-        const targetUrl = IS_DOCKER_INTERNAL ? 'http://host.docker.internal:1337' : TARGET;
+        // const targetUrl = IS_DOCKER_INTERNAL ? 'http://host.docker.internal:1337' : TARGET;
+        const targetUrl = 'http://strapi-s3:1337';
 
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 2000);
@@ -56,7 +57,7 @@ class HealthService {
             if (error.name === 'AbortError') {
                 console.log('Health check timed out');
             } else {
-                console.log('Health check failed:', error.message);
+                console.log(`Health check failed for target ${targetUrl}:`, error.message);
             }
         }
     }

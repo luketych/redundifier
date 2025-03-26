@@ -29,6 +29,9 @@ router.post('/*', express.raw({ type: '*/*' }), healthCheckMiddleware, async (re
         // Send the same request twice
         const [response1, response2] = await sendDuplicateRequests(fullPath, req.headers, req.body);
 
+        console.log(response1)
+        console.log(response2)
+
         if (response1.type === 'json' && response2.type === 'json') {
             // For JSON responses, combine them into an array with metadata
             const combinedData = formatJsonResponses(response1, response2);
