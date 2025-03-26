@@ -39,14 +39,16 @@ async function sendRequest(targetUrl, headers, body, method = 'POST') {
             throwHttpErrors: false
         };
 
-        if (body instanceof FormData) {
-            console.log('[REQUEST] Handling FormData upload');
-            options.body = body;
-        } else {
-            console.log('[REQUEST] Handling regular request');
-            // If body is already a string, use it as is, otherwise stringify it
-            options.body = typeof body === 'string' ? body : JSON.stringify(body);
-            delete options.headers['content-length'];
+        if (method !== 'GET' && method !== 'HEAD') {
+            if (body instanceof FormData) {
+                console.log('[REQUEST] Handling FormData upload');
+                options.body = body;
+            } else {
+                console.log('[REQUEST] Handling regular request');
+                // If body is already a string, use it as is, otherwise stringify it
+                options.body = typeof body === 'string' ? body : JSON.stringify(body);
+                delete options.headers['content-length'];
+            }
         }
 
         console.log('[REQUEST] Final request options:', JSON.stringify({
@@ -119,12 +121,11 @@ async function sendRequest(targetUrl, headers, body, method = 'POST') {
 
         const contentType = response.headers['content-type'] || '';
         const responseData = {
-            type: contentType.includes('application/json') ? 'json' : 'binary',
             status: response.statusCode,
             headers: response.headers,
             data: contentType.includes('application/json') 
                 ? JSON.parse(response.body)
-                : Buffer.from(response.body)
+                : response.body
         };
 
         return responseData;
@@ -155,17 +156,17 @@ async function sendDuplicateRequests(path, headers, body, method = 'POST') {
     console.log(`[DUPLICATE] Original path: ${path}`);
     console.log(`[DUPLICATE] Method: ${method}`);
 
-    // Remove /api/upload prefix from path
-    const cleanPath = path.replace(/^\/api\/upload/, '');
+    // Remove /api prefix from path
+    const cleanPath = path.replace(/^\/api/, '');
     console.log(`[DUPLICATE] Clean path: ${cleanPath}`);
 
     let targetUrl;
     if (IS_DOCKER_INTERNAL) {
         // Use host.docker.internal when running in Docker
-        targetUrl = `http://host.docker.internal:1337${cleanPath}`;
+        targetUrl = `http://host.docker.internal:1337/api${cleanPath}`;
         console.log(`[DUPLICATE] Using Docker URL: ${targetUrl}`);
     } else {
-        targetUrl = `${TARGET}${cleanPath}`;
+        targetUrl = `${TARGET}/api${cleanPath}`;
         console.log(`[DUPLICATE] Using target URL: ${targetUrl}`);
     }
     return Promise.all([

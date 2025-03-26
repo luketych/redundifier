@@ -1,6 +1,7 @@
 const express = require('express');
 const uploadRoutes = require('./upload');
 const atomsRoutes = require('./atoms');
+const redundafierRoutes = require('./redundafier');
 
 const router = express.Router();
 
@@ -23,6 +24,12 @@ router.use('/upload', (req, res, next) => {
 router.use('/atoms', (req, res, next) => {
     console.log('[ROUTER] Atoms request:', req.method, req.url);
     atomsRoutes(req, res, err => err ? next(err) : next());
+});
+
+// Mount redundafier routes
+router.use('/redundafier', (req, res, next) => {
+    console.log('[ROUTER] Redundafier request:', req.method, req.url);
+    redundafierRoutes(req, res, err => err ? next(err) : next());
 });
 
 // Add error handler last
