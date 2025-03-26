@@ -1,21 +1,56 @@
 const express = require('express');
-const { TARGET, IS_DOCKER_INTERNAL } = require('../config/server');
 const { sendDuplicateRequests } = require('../services/request');
 
 const router = express.Router();
 
-// Handle GET requests to /*
-router.get('/*', express.json(), async (req, res, next) => {
+/**
+ * Error handler middleware
+ * @param {Error} error - The error object
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @param {Function} next - Express next function
+ */
+const handleError = (error, req, res, next) => {
+    console.error('[REDUNDAFIER] Error:', error);
+    res.status(500).json({
+        error: {
+            message: error.message
+        }
+    });
+};
+
+/**
+ * Parse response data if it's a JSON string
+ * @param {any} data - The response data
+ * @returns {any} - The parsed data or original data
+ */
+const parseResponseData = (data) => {
+    if (typeof data === 'string') {
+        try {
+            return JSON.parse(data);
+        } catch (error) {
+            return data;
+        }
+    }
+    return data;
+};
+
+/**
+ * Handle all requests to the redundafier endpoint
+ * @param {Request} req - Express request object
+ * @param {Response} res - Express response object
+ * @param {Function} next - Express next function
+ */
+const handleRequest = async (req, res, next) => {
     try {
-        const fullPath = req.originalUrl;
-        console.log('[REDUNDAFIER] Handling GET request:', fullPath);
+        console.log('[REDUNDAFIER] Handling', req.method, 'request:', req.originalUrl);
         console.log('[REDUNDAFIER] Request headers:', req.headers);
 
-        // Remove /api/redundafier prefix to get the original API path
-        const originalPath = fullPath.replace(/^\/api\/redundafier/, '');
-        console.log('[REDUNDAFIER] Original path:', originalPath);
+        // Extract path and authorization header
+        const path = req.originalUrl.replace('/api/redundafier', '');
+        console.log('[REDUNDAFIER] Original path:', path);
 
-        // Create headers for the request
+        // Prepare headers
         const headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
@@ -23,74 +58,46 @@ router.get('/*', express.json(), async (req, res, next) => {
 
         // Forward authorization header if present
         if (req.headers.authorization) {
-            headers.authorization = req.headers.authorization;
             console.log('[REDUNDAFIER] Forwarding authorization header');
+            headers.authorization = req.headers.authorization;
         }
 
-        // Send duplicate requests and get responses
-        const responses = await sendDuplicateRequests(originalPath, headers, null, 'GET');
-        
-        // Bundle the responses
+        // Send duplicate requests
+        const responses = await sendDuplicateRequests(
+            path,
+            headers,
+            req.method === 'GET' ? null : req.body,
+            req.method
+        );
+
+        // Bundle responses
         const bundledResponse = {
             responses: responses.map((response, index) => ({
                 requestNumber: index + 1,
                 status: response.status,
-                data: typeof response.data === 'string' ? JSON.parse(response.data) : response.data
+                data: parseResponseData(response.data)
             }))
         };
 
         console.log('[REDUNDAFIER] Bundled response:', JSON.stringify(bundledResponse, null, 2));
-        
         res.json(bundledResponse);
     } catch (error) {
-        console.error('[REDUNDAFIER] Error:', error);
         next(error);
     }
-});
+};
 
-// Handle POST requests to /*
-router.post('/*', express.json(), async (req, res, next) => {
-    try {
-        const fullPath = req.originalUrl;
-        console.log('[REDUNDAFIER] Handling POST request:', fullPath);
-        console.log('[REDUNDAFIER] Request headers:', req.headers);
-        console.log('[REDUNDAFIER] Request body:', JSON.stringify(req.body, null, 2));
+// Register routes
+router.get('/*', handleRequest);
+router.post('/*', handleRequest);
 
-        // Remove /api/redundafier prefix to get the original API path
-        const originalPath = fullPath.replace(/^\/api\/redundafier/, '');
-        console.log('[REDUNDAFIER] Original path:', originalPath);
-
-        // Create headers for the request
-        const headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        };
-
-        // Forward authorization header if present
-        if (req.headers.authorization) {
-            headers.authorization = req.headers.authorization;
-            console.log('[REDUNDAFIER] Forwarding authorization header');
+// Register error handler as the last middleware
+router.use((err, req, res, next) => {
+    console.error('[REDUNDAFIER] Error:', err);
+    res.status(500).json({
+        error: {
+            message: err.message
         }
-
-        // Send duplicate requests and get responses
-        const responses = await sendDuplicateRequests(originalPath, headers, req.body, 'POST');
-        
-        // Bundle the responses
-        const bundledResponse = {
-            responses: responses.map((response, index) => ({
-                requestNumber: index + 1,
-                status: response.status,
-                data: typeof response.data === 'string' ? JSON.parse(response.data) : response.data
-            }))
-        };
-
-        console.log('[REDUNDAFIER] Bundled response:', JSON.stringify(bundledResponse, null, 2));
-        
-        res.json(bundledResponse);
-    } catch (error) {
-        console.error('[REDUNDAFIER] Error:', error);
-        next(error);
-    }
+    });
 });
 
 module.exports = router; 

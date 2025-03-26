@@ -6,63 +6,64 @@ const { sendRequest } = require('../services/request');
 const router = express.Router();
 
 // Handle GET requests to /*
-router.get('/*', (req, res) => {
-    const fullPath = req.originalUrl;
-    console.log('[ATOMS] Handling GET request:', fullPath);
-    console.log('[ATOMS] Request headers:', req.headers);
+router.get('/*', async (req, res, next) => {
+    try {
+        const fullPath = req.originalUrl;
+        console.log('[ATOMS] Handling GET request:', fullPath);
+        console.log('[ATOMS] Request headers:', req.headers);
 
-    const baseUrl = IS_DOCKER_INTERNAL ? 'http://host.docker.internal:1337' : TARGET;
-    // For Strapi API, we need to use /api/atoms instead of just /atoms
-    const pathWithoutPrefix = req.originalUrl.replace(/^\/api\/atoms/, '/api/atoms');
-    const targetUrl = new URL(pathWithoutPrefix, baseUrl);
+        const baseUrl = process.env.IS_DOCKER_INTERNAL === 'true' ? 'http://host.docker.internal:1337' : TARGET;
+        // For Strapi API, we need to use /api/atoms instead of just /atoms
+        const pathWithoutPrefix = req.originalUrl.replace(/^\/api\/atoms/, '/api/atoms');
+        const targetUrl = new URL(pathWithoutPrefix, baseUrl);
 
-    console.log('[ATOMS] Forwarding to:', targetUrl.toString());
+        console.log('[ATOMS] Forwarding to:', targetUrl.toString());
 
-    // Create request options with headers
-    const options = {
-        headers: {
+        // Create request options with headers
+        const headers = {
             'Accept': 'application/json',
             'Content-Type': 'application/json'
+        };
+
+        // Forward authorization header if present
+        if (req.headers.authorization) {
+            headers.authorization = req.headers.authorization;
+            console.log('[ATOMS] Forwarding authorization header:', req.headers.authorization);
         }
-    };
 
-    // Forward authorization header if present
-    if (req.headers.authorization) {
-        options.headers.authorization = req.headers.authorization;
-        console.log('[ATOMS] Forwarding authorization header:', req.headers.authorization);
-    }
+        console.log('[ATOMS] Request options:', headers);
 
-    // Forward other relevant headers
-    if (req.headers['content-type']) {
-        options.headers['content-type'] = req.headers['content-type'];
-    }
-
-    console.log('[ATOMS] Request options:', options);
-
-    // Use basic http request with options
-    const proxyReq = http.get(targetUrl, options, (proxyRes) => {
-        console.log('[ATOMS] Target response status:', proxyRes.statusCode);
-        console.log('[ATOMS] Target response headers:', proxyRes.headers);
+        // Send the request using sendRequest
+        const response = await sendRequest(targetUrl.toString(), headers, null, 'GET');
         
-        // Copy headers
-        res.writeHead(proxyRes.statusCode, proxyRes.headers);
-        
-        // Pipe response
-        proxyRes.pipe(res);
-    });
-
-    proxyReq.on('error', (error) => {
-        console.error('[ATOMS] Request error:', error);
-        res.status(503).json({
-            error: 'Service Unavailable',
-            message: 'Failed to process atoms request',
-            details: error.message
+        console.log('[ATOMS] Response received:', {
+            type: response.type,
+            status: response.status,
+            headers: response.headers,
+            data: response.data
         });
-    });
 
-    req.on('close', () => {
-        proxyReq.destroy();
-    });
+        // Forward the response
+        if (response.headers) {
+            Object.entries(response.headers).forEach(([key, value]) => {
+                res.setHeader(key, value);
+            });
+        }
+        
+        res.status(response.status);
+        if (response.type === 'json') {
+            res.json(response.data);
+        } else {
+            // Set content-type to text/plain for non-JSON responses if not already set
+            if (!response.headers || !response.headers['content-type']) {
+                res.setHeader('content-type', 'text/plain');
+            }
+            res.send(response.data);
+        }
+    } catch (error) {
+        console.error('[ATOMS] Error:', error);
+        next(error);
+    }
 });
 
 // Handle POST requests to /*
@@ -73,7 +74,7 @@ router.post('/*', express.json(), async (req, res, next) => {
         console.log('[ATOMS] Request headers:', req.headers);
         console.log('[ATOMS] Request body:', JSON.stringify(req.body, null, 2));
 
-        const baseUrl = IS_DOCKER_INTERNAL ? 'http://host.docker.internal:1337' : TARGET;
+        const baseUrl = process.env.IS_DOCKER_INTERNAL === 'true' ? 'http://host.docker.internal:1337' : TARGET;
         // Ensure we're using the correct Strapi API path
         const pathWithoutPrefix = req.originalUrl.replace(/^\/api\/atoms/, '/api/atoms');
         const targetUrl = new URL(pathWithoutPrefix, baseUrl);
@@ -106,14 +107,20 @@ router.post('/*', express.json(), async (req, res, next) => {
         });
 
         // Forward the response
-        Object.entries(response.headers).forEach(([key, value]) => {
-            res.setHeader(key, value);
-        });
+        if (response.headers) {
+            Object.entries(response.headers).forEach(([key, value]) => {
+                res.setHeader(key, value);
+            });
+        }
         
         res.status(response.status);
         if (response.type === 'json') {
             res.json(response.data);
         } else {
+            // Set content-type to text/plain for non-JSON responses if not already set
+            if (!response.headers || !response.headers['content-type']) {
+                res.setHeader('content-type', 'text/plain');
+            }
             res.send(response.data);
         }
     } catch (error) {

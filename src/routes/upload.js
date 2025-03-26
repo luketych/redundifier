@@ -6,94 +6,86 @@ const { formatJsonResponses, setResponseHeaders } = require('../services/respons
 const { TARGET, IS_DOCKER_INTERNAL } = require('../config/server');
 
 const router = express.Router();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer();
 
-// Handle POST requests to root for file uploads
 // Validation middleware
 const validateUpload = (req, res, next) => {
     if (!req.files || req.files.length === 0) {
         return res.status(400).json({
             error: 'Bad Request',
-            message: 'No files were uploaded'
+            message: 'No files uploaded'
         });
     }
+
+    for (const file of req.files) {
+        if (!file.buffer || file.buffer.length === 0) {
+            return res.status(400).json({
+                error: 'Bad Request',
+                message: `Invalid file buffer for: ${file.originalname}`
+            });
+        }
+    }
+
     next();
 };
 
-// Error handling middleware
-const errorHandler = (err, req, res, next) => {
-    console.error('[UPLOAD] Error:', err);
-    res.status(503).json({
-        error: 'Service Unavailable',
-        message: 'Upload processing failed',
-        details: err.message
-    });
+// Function to create form data with validation
+const createFormData = (files) => {
+    if (!files || files.length === 0) {
+        throw new Error('No files provided');
+    }
+
+    const form = new FormData();
+    for (const file of files) {
+        if (!file.buffer || file.buffer.length === 0) {
+            throw new Error(`Invalid file buffer for: ${file.originalname}`);
+        }
+        form.append('files', file.buffer, {
+            filename: file.originalname,
+            contentType: file.mimetype
+        });
+    }
+    return form;
 };
 
-router.post('/', [
-    upload.array('files'), 
-    validateUpload
-], async (req, res, next) => {
-    console.log('[UPLOAD] Received request');
-    console.log('[UPLOAD] Headers:', JSON.stringify(req.headers, null, 2));
-    console.log('[UPLOAD] Files:', req.files.map(f => ({
-        name: f.originalname,
-        mimetype: f.mimetype,
-        size: f.size
-    })));
-    const fullPath = req.originalUrl;
-    const baseUrl = IS_DOCKER_INTERNAL ? 'http://host.docker.internal:1337' : TARGET;
-    console.log('[UPLOAD] Intercepted request to:', fullPath);
-    console.log('[UPLOAD] Content-Type:', req.headers['content-type']);
-    console.log('[UPLOAD] Target URL:', baseUrl);
-    
+router.post('/', upload.array('files'), validateUpload, async (req, res) => {
     try {
-        // Function to create form data with validation
-        const createFormData = () => {
-            const form = new FormData();
-            req.files.forEach((file, index) => {
-                console.log(`[UPLOAD] Processing file ${index + 1}:`, {
-                    name: file.originalname,
-                    type: file.mimetype,
-                    size: file.size
-                });
-
-                if (!file.buffer) {
-                    throw new Error(`Missing buffer for file: ${file.originalname}`);
-                }
-
-                form.append('files', Buffer.from(file.buffer), {
-                    filename: file.originalname,
-                    contentType: file.mimetype
-                });
+        let formData;
+        try {
+            formData = createFormData(req.files);
+        } catch (err) {
+            return res.status(400).json({
+                error: 'Bad Request',
+                message: err.message || 'Form data creation failed'
             });
-            return form;
-        };
-
-        // Temporarily try just one request to debug
-        console.log('[UPLOAD] Creating form data');
-        const form = createFormData();
-        
-        console.log('[UPLOAD] Sending single request');
-        const response = await sendRequest(`${baseUrl}/api/upload`, req.headers, form, req.method);
-        
-        console.log('[UPLOAD] Response received:', {
-            type: response.type,
-            status: response.status,
-            headers: response.headers
-        });
-
-        // Forward the response
-        setResponseHeaders(res, response.headers);
-        res.status(response.status);
-        if (response.type === 'json') {
-            res.json(response.data);
-        } else {
-            res.send(response.data);
         }
-    } catch (error) {
-        next(error);
+
+        // Forward request to target
+        const target = process.env.IS_DOCKER_INTERNAL === 'true' ? 'http://host.docker.internal:1337' : 'http://localhost:1337';
+        const response = await sendRequest(`${target}/api/upload`, req.headers, formData, 'POST');
+
+        // Send response
+        if (response.headers && response.headers['content-type'] && !response.headers['content-type'].includes('application/json')) {
+            setResponseHeaders(res, response.headers);
+            res.set('Content-Type', 'text/plain');
+            res.send(response.text);
+        } else {
+            res.json(response);
+        }
+    } catch (err) {
+        // Handle different types of errors
+        if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
+            res.status(503).json({
+                error: 'Service Unavailable',
+                message: err.message || 'Target server is not available'
+            });
+        } else {
+            res.status(503).json({
+                error: 'Service Unavailable',
+                message: err.message || 'Unknown error occurred'
+            });
+        }
     }
-}, errorHandler);
+});
 
 module.exports = router;

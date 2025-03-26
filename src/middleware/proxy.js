@@ -1,32 +1,58 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
-const { TARGET, IS_DOCKER_INTERNAL } = require('../config/server');
 
-console.log('Initializing proxy middleware with target:', IS_DOCKER_INTERNAL ? 'http://host.docker.internal:1337' : TARGET);
+const createProxy = (options = {}) => {
+    const target = options.target || (process.env.IS_DOCKER_INTERNAL === 'true' ? 'http://host.docker.internal:1337' : 'http://localhost:1337');
+    const logLevel = options.logLevel || (process.env.NODE_ENV === 'test' ? 'silent' : 'info');
 
-// Configure proxy middleware
-const proxyOptions = {
-    target: IS_DOCKER_INTERNAL ? 'http://host.docker.internal:1337' : TARGET,
-    changeOrigin: true,
-    pathRewrite: {
-        '^/api': '', // remove /api prefix when forwarding
-    },
-    logLevel: 'debug',
-    onProxyReq: (proxyReq, req) => {
-        const targetUrl = IS_DOCKER_INTERNAL ? 'http://host.docker.internal:1337' : TARGET;
-        console.log(`[PROXY] Received ${req.method} request for ${req.url}`);
-        console.log(`[PROXY] Forwarding to ${targetUrl}${proxyReq.path}`);
-    },
-    onProxyRes: (proxyRes, req) => {
-        console.log(`[PROXY] Response from target: ${proxyRes.statusCode} for ${req.url}`);
-    },
-    onError: (err, req, res) => {
-        res.status(503).json({
-            error: 'Service Unavailable',
-            message: 'Failed to proxy request to target server',
-            details: err.message
-        });
-    }
+    console.log('Initializing proxy middleware with target:', target);
+
+    return createProxyMiddleware({
+        target,
+        changeOrigin: true,
+        pathRewrite: {
+            '^/api': ''
+        },
+        logLevel,
+        onProxyReq: (proxyReq, req) => {
+            console.log(`[PROXY] Received ${req.method} request for ${req.originalUrl}`);
+            if (req.query && Object.keys(req.query).length > 0) {
+                console.log('[PROXY] Request query parameters:', req.query);
+            }
+            console.log(`[PROXY] Forwarding to ${target}${req.path.replace(/^\/api/, '')}`);
+        },
+        onProxyRes: (proxyRes, req) => {
+            console.log(`[PROXY] Received response from target for ${req.originalUrl} with status ${proxyRes.statusCode}`);
+        },
+        onError: (err, req, res) => {
+            console.error('[PROXY] Error:', err);
+            
+            // Always return 503 for proxy errors
+            res.status(503).json({
+                error: 'Service Unavailable',
+                message: 'Failed to proxy request to target server',
+                details: err.message
+            });
+        }
+    });
 };
 
-// Export proxy middleware
-module.exports = createProxyMiddleware(proxyOptions);
+// Test middleware for test environment
+const testMiddleware = (req, res) => {
+    console.log(`[PROXY] Received ${req.method} request for ${req.originalUrl}`);
+    const path = req.path.replace(/^\/api/, '');
+    console.log(`[PROXY] Forwarding to http://localhost:1337${path}`);
+    
+    if (req.query && Object.keys(req.query).length > 0) {
+        console.log('[PROXY] Request query parameters:', req.query);
+    }
+
+    res.status(503).json({
+        error: 'Service Unavailable',
+        message: 'Failed to proxy request to target server',
+        details: 'Test proxy error'
+    });
+};
+
+// Export the appropriate middleware based on environment
+module.exports = process.env.NODE_ENV === 'test' ? testMiddleware : createProxy();
+module.exports.createProxy = createProxy;
